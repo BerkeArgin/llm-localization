@@ -1,0 +1,13 @@
+*/*.pkl
+*.pkl
+*.csv
+*.json
+*.jsonl
+*.pt
+catboost_info/*
+data/*
+old/*
+
+.env
+*.pyc
+associations/*
