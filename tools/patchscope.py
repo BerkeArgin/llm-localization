@@ -65,6 +65,113 @@ def patch_scope_gen(nnmodel, tokenizer, model_output, verbose=False,
     # go from toks to strings
     return {k: [tokenizer.decode(t) for t in v] for k, v in l2toks.items()}, probas
 
+from tqdm import trange
+
+def zero_ablate_scope_gen(nnmodel, tokenizer, 
+                          verbose=False,
+                          target_prompt=None,
+                          target_token_idx=-1,
+                          n_new_tokens=10):
+    """
+    Generates completions for each layer i by zero-ablating the output
+    at layer i (instead of swapping in external residuals).
+
+    Arguments:
+    ----------
+    nnmodel : Your model wrapper that supports .trace() context, etc.
+    tokenizer : Tokenizer with a .decode() method
+    verbose : bool
+        If True, uses trange() for progress, else uses range()
+    target_prompt : str or None
+        If None, uses a fallback prompt. Otherwise, the prompt used to generate completions.
+    target_token_idx : int
+        The token index at which we zero out the activation. Default: -1 (the last token).
+    n_new_tokens : int
+        Number of new tokens to generate.
+
+    Returns:
+    --------
+    l2decoded : dict
+        Dictionary mapping layer index i -> list of generated completions.
+    probas : torch.Tensor
+        Shape [n_layers, n_new_tokens, vocab_size]. The probability distribution
+        over the vocabulary at each generation step, for each layer i.
+    """
+
+    # If no prompt is given, use a default
+    if target_prompt is None:
+        id_prompt_target = "cat -> cat\n1135 -> 1135\nhello -> hello\n?"
+    else:
+        id_prompt_target = target_prompt
+
+    # Convert the prompt to tokens
+    id_prompt_tokens = tokenizer(
+        id_prompt_target, return_tensors="pt", padding=True
+    )["input_ids"].to(nnmodel.device)
+
+    # Prepare iteration over layers
+    n_layers = len(nnmodel.model.layers)
+    layer_iter = trange(n_layers) if verbose else range(n_layers)
+
+    # We'll collect:
+    #  - the per-layer generated tokens
+    #  - the probability distributions for each generation step
+    l2toks = {}
+    probas_all_layers = []
+
+    # Loop over layers, zero-ablating that layer
+    for i in layer_iter:
+        # We'll start fresh from the same prompt for each layer i
+        toks = id_prompt_tokens.repeat(1, 1)
+        start_len = toks.shape[1]
+
+        # Probability distributions for each of the n_new_tokens steps
+        probas_for_layer = []
+
+        for idx_tok in range(n_new_tokens):
+            offset = -idx_tok if target_token_idx < 0 else 0
+
+            with nnmodel.trace(toks, validate=False, scan=False):
+
+                # 2. Zero out the layer i’s output for the chosen token index
+                #    Usually we do this for the last token; hence the indexing
+                #    [:, target_token_idx + offset, :].
+                layer_input = nnmodel.model.layers[i].input[0].clone().save()
+                nnmodel.model.layers[i].output[0][:, :, :] = layer_input
+                #layer_input[:, :, :]
+
+                # 3. Extract the logits from the LM head (the final token)
+                logits = nnmodel.lm_head.output[:, -1, :].save()
+            
+            # Save the softmax distribution for this step
+            probas_for_layer.append(logits.value.softmax(dim=-1).detach().cpu())
+
+            # Choose the top token to append
+            pred_tok = t.argmax(logits.value, dim=-1, keepdim=True)
+            # Append to `toks` so we can generate the next token
+            toks = t.cat([toks, pred_tok.to(toks.device)], dim=-1)
+
+        # Save the distribution for each step
+        probas_all_layers.append(t.stack(probas_for_layer))
+
+        # Also record the newly generated tokens (beyond the prompt)
+        # We keep only tokens after the original prompt length
+        l2toks[i] = toks.detach().cpu()[:, start_len:]
+    
+    # Stack probas => shape [n_layers, n_new_tokens, batch=1, vocab_size] 
+    # but we only keep batch=0 slice in many setups
+    probas_all_layers = t.stack(probas_all_layers)  # [n_layers, n_new_tokens, 1, vocab_size]
+    probas_all_layers = probas_all_layers[:, :, 0]  # [n_layers, n_new_tokens, vocab_size]
+
+    # Convert tokens to text for each layer’s generations
+    l2decoded = {
+        layer_idx: [tokenizer.decode(seq) for seq in seqs]
+        for layer_idx, seqs in l2toks.items()
+    }
+
+    return l2decoded, probas_all_layers
+
+
 def plot_probs(data_row, probs, token_index=0, tokenizer=None):
     ans_west = data_row["ans_west"]
     ans_local = data_row["ans_local"]
