@@ -1,13 +1,8 @@
-import matplotlib.colors as mcolors
 from tqdm import trange
-import pandas as pd
 import torch as t
-from IPython.display import display, HTML
-import matplotlib.pyplot as plt
-from typing import Union, List, Optional, Dict
+import torch.nn.functional as F
 from tqdm.auto import trange
-from transformers import AutoTokenizer
-from transformer_lens import HookedTransformer
+from tools.decoding import top_k_top_p_filtering, decode_next_token_with_sampling
 
 
 def contrastive_act_lens(nnmodel, tokenizer, intervene_vec, intervene_tok=-1,target_prompt = None, verbose=False):
@@ -27,6 +22,158 @@ def contrastive_act_lens(nnmodel, tokenizer, intervene_vec, intervene_tok=-1,tar
         
     all_logits = t.stack(all_logits)
     return all_logits
+
+def contrastive_act_gen_opt(
+    nnmodel, 
+    tokenizer, 
+    intervene_vec, 
+    intervene_tok=-1, 
+    verbose=False,
+    prompt=None, 
+    n_new_tokens=10, 
+    layer=None,
+    use_sampling=False
+):
+    """
+    Generates tokens by patching the activations at a specified layer (or all layers) 
+    with 'intervene_vec'. Returns a dictionary mapping layer -> [list of generated completions]
+    and a probabilities tensor with shape:
+        (n_layers_tested, batch_size, n_new_tokens, vocab_size).
+
+    Parameters
+    ----------
+    nnmodel : YourModelClass
+        Model with a 'trace' context manager, 'model.layers', 'lm_head.output', etc.
+    tokenizer : YourTokenizerClass
+        Tokenizer with a 'decode' method and a callable that returns 'input_ids'.
+    intervene_vec : torch.Tensor
+        The vector (or set of vectors) to add into the residual stream at a given layer.
+        Shapes might be: (n_layers, batch_size, d_model) OR (batch_size, d_model).
+    intervene_tok : int
+        Index of the token at which to intervene (negative means from the end).
+        [Currently not heavily used in this logic, but kept for compatibility.]
+    verbose : bool
+        If True, use a progress bar over layers.
+    prompt : str
+        The text prompt to encode.
+    n_new_tokens : int
+        Number of new tokens to generate.
+    layer : int or list[int], optional
+        The layer(s) at which to apply the intervention. If None, will test all layers.
+
+    Returns
+    -------
+    completions_dict : dict
+        Dict of { layer_index : [decoded_sequence_1, decoded_sequence_2, ...] }.
+    probas : torch.Tensor
+        Tensor of shape (n_tested_layers, batch_size, n_new_tokens, vocab_size).
+    """
+
+    device = nnmodel.device
+    # Encode the prompt
+    model_input = tokenizer(prompt, return_tensors="pt", add_special_tokens=False, padding=True, padding_side="left").to(device)
+    prompt_tokens = model_input["input_ids"].to(device)
+    prompt_len = prompt_tokens.shape[1] - 1
+
+    # Determine which layers to patch
+    if layer is None:
+        layers_to_test = range(len(nnmodel.model.layers))
+    elif isinstance(layer, int):
+        layers_to_test = [layer]
+    else:
+        layers_to_test = layer  # assume list of layer indices
+    
+    # Prepare for progress bar if verbose
+    layer_iterator = trange(len(layers_to_test)) if verbose else layers_to_test
+
+    # Container for final results
+    probas_list = []
+    l2toks = {}
+
+    # We do not need gradients for generation
+    with t.no_grad():
+        for layer_idx in layer_iterator:
+            # For each layer, we replicate the prompt for each "batch" in intervene_vec
+            # If intervene_vec has shape (n_layers, batch_size, d_model),
+            # we pull the slice for this layer_idx. Otherwise broadcast the single intervene_vec
+
+            model_input_base = tokenizer(prompt, return_tensors="pt", add_special_tokens=False, padding=True, padding_side="left").to(device)
+
+            if intervene_vec.ndim == 3:
+                # e.g. shape = [n_layers, batch_size, d_model]
+                single_layer_patch = intervene_vec[layer_idx]  # shape (batch_size, d_model)
+            else:
+                # e.g. shape = [batch_size, d_model], broadcast for all layers
+                single_layer_patch = intervene_vec
+            
+            # Determine batch size from the patch
+            batch_size = single_layer_patch.shape[0]
+            
+            # Repeat the prompt tokens for each item in the batch
+            #toks = prompt_tokens.repeat(batch_size, 1)  # shape (batch_size, seq_len)
+            start_len = model_input_base["input_ids"].shape[1]
+            
+            # Probabilities for each new token (we'll stack them after generation)
+            probas_for_this_layer = []
+
+            # Generate tokens one-by-one (auto-regressive loop)
+            
+            model_input = {key: value.clone().detach() for key, value in model_input_base.items()}
+
+            for _ in range(n_new_tokens): 
+
+                # Run the forward pass under the patch
+                with nnmodel.trace(model_input, validate=False, scan=False):
+                    
+                    # Patch only the new portion from 'prompt_len' onward
+                    # Expand patch to match shape = (batch_size, seq_len_after_prompt, d_model)
+                    seq_len_after_prompt = model_input["input_ids"].shape[1] - prompt_len
+                    # single_layer_patch: (batch_size, d_model)
+                    patch_expanded = single_layer_patch.unsqueeze(1).repeat(1, seq_len_after_prompt, 1)
+                    
+                    # Add the patch in place
+                    # shape of nnmodel.model.layers[layer_idx].output[0] is probably: (batch_size, seq_len, d_model)
+                    nnmodel.model.layers[layer_idx].output[0][:, prompt_len:, :] += patch_expanded
+
+                    # Retrieve the logits from the final head at the last token
+                    logits = nnmodel.lm_head.output[:, -1, :].save()
+                
+                if use_sampling:
+                    logits_value = logits.value.cpu()
+                    probs, next_token = decode_next_token_with_sampling(logits_value)
+                    probas_for_this_layer.append(probs.cpu())
+                    next_token = next_token.to(device)
+                else:
+                    # Convert to probabilities on CPU (to avoid holding them on GPU)
+                    probs = F.softmax(logits.value, dim=-1)  # shape (batch_size, vocab_size)
+                    probas_for_this_layer.append(probs.cpu())
+
+                    # Pick the next token (greedy). Could do top-k, sampling, etc.
+                    next_token = t.argmax(logits.value, dim=-1, keepdim=True)  # shape (batch_size, 1)
+
+                # Append the new token to 'toks'
+                #toks = t.cat([toks, next_token.to(device)], dim=-1)
+                model_input["input_ids"] = t.cat([model_input["input_ids"], next_token], dim=-1)
+                model_input["attention_mask"] = t.cat([model_input["attention_mask"], t.ones_like(next_token)], dim=-1)
+                if t.all(next_token == tokenizer.eos_token_id):
+                    break
+            # Stack probabilities: shape => (batch_size, n_new_tokens, vocab_size)
+            probas_for_this_layer = t.stack(probas_for_this_layer, dim=1)
+            probas_list.append(probas_for_this_layer)
+
+            # Save final generated tokens (just the newly generated portion)
+            # shape => (batch_size, n_new_tokens)
+            newly_generated_tokens = model_input["input_ids"][:, start_len:].detach().cpu()
+            # Convert each row in the batch to text
+            decoded_texts = [tokenizer.decode(seq) for seq in newly_generated_tokens]
+            l2toks[layer_idx] = decoded_texts
+    
+    # Now probas_list has length == number of tested layers
+    # Each element is shape (batch_size, n_new_tokens, vocab_size)
+    # Stack them => (n_layers_tested, batch_size, n_new_tokens, vocab_size)
+    probas = t.stack(probas_list, dim=0)
+
+    return l2toks, probas
 
 
 def contrastive_act_gen(nnmodel, tokenizer, intervene_vec, intervene_tok=-1, verbose=False,
@@ -68,186 +215,3 @@ def contrastive_act_gen(nnmodel, tokenizer, intervene_vec, intervene_tok=-1, ver
     if None is not None:
         return [tokenizer.decode(t) for t in list(l2toks.values())[0]], probas
     return {k: [tokenizer.decode(t) for t in v] for k, v in l2toks.items()}, probas
-
-
-def contrastive_act_gen_hooked(
-    model: HookedTransformer,
-    tokenizer: AutoTokenizer,
-    intervene_vec: t.Tensor,
-    prompt: str,
-    n_new_tokens: int = 10,
-    layer: Optional[Union[int, List[int]]] = None,
-    intervene_tok: int = -1,
-    verbose: bool = False,
-) -> (Dict[int, List[str]], t.Tensor):
-    """
-    Runs a contrastive generation by adding intervene_vec at the chosen residual stream(s)
-    in HookedTransformer. Returns completions and token probabilities.
-
-    Args:
-        model: A HookedTransformer instance (TransformerLens).
-        tokenizer: A HuggingFace tokenizer.
-        intervene_vec: A tensor with shape:
-                       - either (n_layers, batch_size, d_model) if multi-layer
-                       - or (batch_size, d_model) if single-layer
-                       This tensor is added to the residual stream at the chosen layer(s)
-                       for the newly generated tokens.
-        prompt: The text prompt to start generation from.
-        n_new_tokens: Number of tokens to autoregressively generate.
-        layer: Which layer(s) to intervene on. If None, will patch all layers.
-        intervene_tok: The token index on which to apply the vector. If negative, counts backward from the end.
-        verbose: If True, uses trange for progress display.
-
-    Returns:
-        A tuple:
-          - A dictionary mapping layer_idx -> list of decoded completions (strings),
-          - A tensor of shape (num_layers_being_patched, n_new_tokens, vocab_size) containing
-            the probability distribution for each newly generated token.
-    """
-
-    device = model.cfg.device  # e.g. 'cuda' or 'cpu'
-    model.to(device)
-    model.eval()
-
-    # Tokenize prompt
-    prompt_tokens = tokenizer(prompt, return_tensors="pt")["input_ids"].to(device)
-    prompt_len = prompt_tokens.shape[1]
-
-    # Decide which layers to patch
-    if layer is None:
-        layers_to_patch = list(range(model.cfg.n_layers))
-    elif isinstance(layer, int):
-        layers_to_patch = [layer]
-    else:
-        layers_to_patch = layer
-
-    # We'll store, for each layer, a list of completions
-    layer_to_completions = {}
-    # We'll also store probabilities for each step (layer, step, vocab_size)
-    layer_probs = []
-
-    # For convenience: if intervene_vec has shape (n_layers, batch_size, d_model), 
-    # we assume one "batch_size" dimension that might correspond to different runs.
-    # If intervene_vec has shape (batch_size, d_model), we'll just broadcast it.
-
-    # A small helper to broadcast intervene_vec if needed
-    def get_intervene_slice(
-        intervene_vec: t.Tensor,
-        layer_idx: int,
-        batch_idx: int,
-        seq_len_diff: int
-    ) -> t.Tensor:
-        """
-        Returns the slice of intervene_vec to be added to the residual at layer_idx.
-        We'll broadcast across the newly generated tokens (seq_len_diff).
-        """
-        # If shape is (n_layers, batch_size, d_model):
-        if intervene_vec.dim() == 3:
-            # intervene_vec[i, b, d_model]
-            return intervene_vec[layer_idx, batch_idx].unsqueeze(0).repeat(seq_len_diff, 1)
-        # If shape is (batch_size, d_model):
-        elif intervene_vec.dim() == 2:
-            # intervene_vec[b, d_model]
-            return intervene_vec[batch_idx].unsqueeze(0).repeat(seq_len_diff, 1)
-        else:
-            raise ValueError("intervene_vec must have shape (n_layers, B, d_model) or (B, d_model).")
-
-    # We'll define a single-forward-step function that:
-    # 1. Registers a hooking function that modifies the residual at the chosen layer.
-    # 2. Runs the model forward to get next-token logits.
-    # 3. Removes the hook (so we can re-register it for each new token if we want).
-    def generate_next_token(
-        current_tokens: t.Tensor, 
-        layer_idx: int,
-        batch_idx: int,
-        offset: int
-    ) -> t.Tensor:
-        """
-        Autoregressively generates the next token (argmax).
-        offset is how many tokens we've already generated so far (0 to n_new_tokens-1).
-        """
-        seq_len_diff = current_tokens.shape[1] - prompt_len
-
-        def patch_resid_post_hook(resid: t.Tensor, hook):
-            # resid shape: [batch_size, seq_len, d_model]
-            # We only want to patch the newly generated tokens, i.e. from prompt_len onward.
-            patch_slice = get_intervene_slice(
-                intervene_vec, 
-                layer_idx, 
-                batch_idx,
-                seq_len_diff=seq_len_diff
-            )
-            # Add to the newly generated positions
-            resid[:, prompt_len:, :] += patch_slice
-            return resid
-
-        # Forward pass with hooking
-        with model.hooks(fwd_hooks=[
-            (f"blocks.{layer_idx}.hook_resid_post", patch_resid_post_hook)
-        ]):
-            logits = model(current_tokens)  # [batch_size, seq_len, vocab_size]
-        
-        # Extract the logits for the last token in each batch row
-        next_logits = logits[:, -1, :]  # shape: [batch_size, vocab_size]
-        return next_logits
-
-    # We iterate over each layer, do a batch generation, gather completions & probabilities
-    iteration_range = trange if verbose else range
-    for i in iteration_range(len(layers_to_patch)):
-        layer_idx = layers_to_patch[i]
-        # For demonstration, let's assume we only do a "single" batch at a time 
-        # because your code repeats intervene_vec.shape[1] times. 
-        # Here, we show the logic for a single batch dimension. 
-        # If you have multiple batch dims in intervene_vec, adapt accordingly.
-
-        # We store for each batch dimension, the final strings. If multiple, you'd do it in a loop.
-        completions_for_layer = []
-        
-        # We'll do exactly one pass if intervene_vec.shape[0] is for multiple runs. 
-        # Feel free to adapt for your scenario.
-        batch_size = intervene_vec.shape[1] if intervene_vec.dim() == 3 else intervene_vec.shape[0]
-        # We'll collect probabilities for each newly generated token
-        # shape: (n_new_tokens, vocab_size) per batch item, but let's store them in a python list first.
-        all_probs = []
-
-        for batch_idx in range(batch_size):
-            # Start fresh from the prompt
-            toks = prompt_tokens.clone()
-            
-            # Generate token-by-token
-            for step in range(n_new_tokens):
-                # get next token logits
-                next_logits = generate_next_token(toks, layer_idx, batch_idx, step)
-                # store the softmax distribution
-                dist = next_logits.softmax(dim=-1)  # [batch_size, vocab_size]
-
-                # Suppose we only do 1 batch item at a time in this example:
-                dist_0 = dist[0].detach().cpu()  # shape: [vocab_size]
-                all_probs.append(dist_0)
-
-                # Argmax next token
-                next_token = dist_0.argmax(dim=-1, keepdim=True)  # [1]
-                # Append to existing tokens
-                next_token = next_token.unsqueeze(0).to(device)  # shape [1, 1]
-                toks = t.cat([toks, next_token], dim=-1)
-
-            # Decode final sequence (new tokens only or entire prompt). 
-            # The example code decodes the newly generated tokens, so:
-            new_toks = toks[0, prompt_len:]  # shape [n_new_tokens]
-            completion_str = tokenizer.decode(new_toks)
-            completions_for_layer.append(completion_str)
-
-        # Convert list of distributions into a single tensor: [n_new_tokens, vocab_size]
-        all_probs_tensor = t.stack(all_probs, dim=0)  # [n_new_tokens * batch_size, vocab_size]
-        # If you have multiple batch items, you may want to reshape to [batch_size, n_new_tokens, vocab_size].
-        # For simplicity, let's store them as is. We'll just keep the last one (if you only want the first item).
-        layer_probs.append(all_probs_tensor)
-
-        # Save completions
-        layer_to_completions[layer_idx] = completions_for_layer
-
-    # Finally, stack the probabilities along dimension 0 (one entry per layer):
-    # shape: [num_layers, n_new_tokens * batch_size, vocab_size]
-    probs = t.stack(layer_probs, dim=0)
-
-    return layer_to_completions, probs

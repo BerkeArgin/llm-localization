@@ -146,21 +146,30 @@ def calculate_perplexity(logits: Tensor, target_tokens: Tensor) -> float:
 
 def get_answer_type_final(row, check_for = "index", format="{0}"):
     if check_for=="index":
-        ans_en = str(row["ans_west_idx"])
-        ans_tr = str(row["ans_local_idx"])
+        if row["source_id"] == "xculturebench":
+            ans_en = "culturebench"
+            ans_tr = str(int(row["ans_local_idx"])+1)
+
+        else:
+            ans_en = str(int(row["ans_west_idx"]))
+            ans_tr = str(int(row["ans_local_idx"]))
     else:
-        ans_en = format.format(row["ans_west"]).lower()
-        ans_tr = format.format(row["ans_local"]).lower()
+        ans_en = format.format(row["ans_west"]).lower().strip()
+        ans_tr = format.format(row["ans_local"]).lower().strip()
+    
+    if row["source_id"] == "xculturebench":
+        ans_en = "culturebench"
 
     
     row["ans_type"] = "none"
-    if ans_en in row["output"].lower() and ans_tr in row["output"].lower():
-        en_index = row["output"].lower().index(ans_en)
-        tr_index = row["output"].lower().index(ans_tr)
+    out = str(row["output"]).lower().strip()
+    if ans_en in out and ans_tr in out:
+        en_index = out.index(ans_en)
+        tr_index = out.index(ans_tr)
         row["ans_type"] = "west" if en_index < tr_index else "local"
-    elif ans_en in row["output"].lower():
+    elif ans_en in out:
         row["ans_type"] = "west"
-    elif ans_tr in row["output"].lower():
+    elif ans_tr in out:
         row["ans_type"] = "local"
 
     return row

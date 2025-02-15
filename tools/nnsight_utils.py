@@ -81,10 +81,10 @@ def get_gen_logits(nnmodel, prompt):
     prediction_logits = t.stack(prediction_logits).squeeze(1)
     return prediction_logits
 
-def get_text_generations(nnmodel, tokenizer, batch, device, max_new_tokens=20):
+def get_text_generations(model, tokenizer, batch, device, **kwargs):
     encoding = tokenizer(batch, return_tensors='pt', add_special_tokens=False, padding=True, padding_side="left").to(device)
     with t.no_grad():
-        generated_ids = nnmodel._model.generate(**encoding, max_new_tokens=max_new_tokens, pad_token_id=tokenizer.eos_token_id)
+        generated_ids = model.generate(**encoding, pad_token_id=tokenizer.eos_token_id, **kwargs)
     generated_ids = generated_ids[:, encoding['input_ids'].shape[-1]:]
     generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
     return generated_texts

@@ -18,8 +18,11 @@ class SwissAIWrapper:
         return [self.text_gen(e) for e in batch]
 
 class OpenAIWrapper:
-    def __init__(self, api_key):
-        self.client = openai.Client(api_key=api_key)
+    def __init__(self, api_key, base_url=None):
+        if base_url is None:
+            self.client = openai.Client(api_key=api_key)
+        else:
+            self.client = openai.Client(api_key=api_key, base_url=base_url)
         self.last_batch_input_file = None
     
     def prompt_to_msg(self, prompt):
@@ -30,9 +33,15 @@ class OpenAIWrapper:
             messages = self.prompt_to_msg(messages)
         res = self.client.chat.completions.create(
             model=model_name,
-            messages=messages
+            messages=messages,
+            temperature=0,  # Greedy decoding
+            top_p=1,         # No nucleus sampling
+            n=1,              # Single output
         )
-        return res.choices[0].message.content
+        if len(res.choices) == 1:
+            return res.choices[0].message.content
+        else:
+            return [res.choices[i].message.content for i in range(len(res.choices))]
     
     def generate_batch_file(self,conversations, model_name="gpt-4o", job_id="job-1"):
         requests = []
@@ -42,6 +51,9 @@ class OpenAIWrapper:
                     "method": "POST",
                     "url": "/v1/chat/completions",
                     "body": {"model": model_name,
+                             "temperature": 0,  # Greedy decoding
+                                "top_p": 1,         # No nucleus sampling
+                                "n": 1,              # Single output
                                 "messages": messages}}
             requests.append(request)
 

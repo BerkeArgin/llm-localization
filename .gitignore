@@ -11,3 +11,5 @@ old/*
 .env
 *.pyc
 associations/*
+
+plots/*
