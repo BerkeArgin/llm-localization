@@ -53,7 +53,7 @@ def decode_next_token_with_sampling(logits):
     Decodes the next token using temperature, top-k, and top-p sampling.
     """
     # --- 1. Apply temperature ---
-    temperature = 0.7
+    temperature = 1.0
     logits_scaled = logits / temperature
 
     # --- 2. Apply top-k / top-p filtering ---
