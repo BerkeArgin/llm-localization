@@ -2,26 +2,7 @@ from tqdm import trange
 import torch as t
 import torch.nn.functional as F
 from tqdm.auto import trange
-from tools.decoding import top_k_top_p_filtering, decode_next_token_with_sampling
-
-
-def contrastive_act_lens(nnmodel, tokenizer, intervene_vec, intervene_tok=-1,target_prompt = None, verbose=False):
-    if target_prompt is None:
-        id_prompt_target = "cat -> cat\n1135 -> 1135\nhello -> hello\n?"
-    else:
-        id_prompt_target = target_prompt
-
-    id_prompt_tokens = tokenizer(id_prompt_target, return_tensors="pt", padding=True)["input_ids"].to(nnmodel.device)
-    all_logits = []
-    lrange = trange(len(nnmodel.model.layers)) if verbose else range(len(nnmodel.model.layers))
-    for i in lrange:
-        with nnmodel.trace(id_prompt_tokens.repeat(intervene_vec.shape[1], 1), validate=False, scan=False):
-            nnmodel.model.layers[i].output[0][:,intervene_tok,:] += intervene_vec[i, :, :]
-            logits = nnmodel.lm_head.output[:, -1, :].save()
-        all_logits.append(logits.value.detach().cpu())
-        
-    all_logits = t.stack(all_logits)
-    return all_logits
+from tools.decoding import decode_next_token_with_sampling
 
 def contrastive_act_gen_opt(
     nnmodel, 
@@ -42,10 +23,10 @@ def contrastive_act_gen_opt(
 
     Parameters
     ----------
-    nnmodel : YourModelClass
-        Model with a 'trace' context manager, 'model.layers', 'lm_head.output', etc.
-    tokenizer : YourTokenizerClass
-        Tokenizer with a 'decode' method and a callable that returns 'input_ids'.
+    nnmodel : LanguageModel
+        nnsight LanguageModel class with a 'trace' context manager
+    tokenizer : AutoTokenizer
+        AutoTokenizer class for encoding/decoding text
     intervene_vec : torch.Tensor
         The vector (or set of vectors) to add into the residual stream at a given layer.
         Shapes might be: (n_layers, batch_size, d_model) OR (batch_size, d_model).
@@ -55,7 +36,7 @@ def contrastive_act_gen_opt(
     verbose : bool
         If True, use a progress bar over layers.
     prompt : str
-        The text prompt to encode.
+        The text prompt to encode. Must contain the special tokens.
     n_new_tokens : int
         Number of new tokens to generate.
     layer : int or list[int], optional
@@ -174,44 +155,3 @@ def contrastive_act_gen_opt(
     probas = t.stack(probas_list, dim=0)
 
     return l2toks, probas
-
-
-def contrastive_act_gen(nnmodel, tokenizer, intervene_vec, intervene_tok=-1, verbose=False,
-                        prompt=None, n_new_tokens=10, layer=None):
-    """
-    residuals: (n_layers, batch_size, seq_len, dmodel)
-    returns a list of completions when patching at different layers, and the token probabilities
-    """
-
-    prompt_tokens = tokenizer(prompt, return_tensors="pt", padding=True)["input_ids"].to(nnmodel.device)
-    probas = []
-    layers = range(len(nnmodel.model.layers)) if layer is None else layer
-    lrange = trange(len(layers)) if verbose else layers
-    l2toks = {}
-    prompt_len = prompt_tokens.shape[1]-1
-    
-    for i in lrange:
-        toks = prompt_tokens.repeat(intervene_vec.shape[1], 1)
-        start_len = toks.shape[1]
-        probas_tok = []
-        for idx_tok in range(n_new_tokens):
-            T = toks.shape[1]
-            token_index = intervene_tok-idx_tok if intervene_tok < 0 else intervene_tok
-
-            with nnmodel.trace(toks, validate=False, scan=False):
-                if len(intervene_vec.shape)>2:
-                    nnmodel.model.layers[i].output[0][:, prompt_len:, :] += intervene_vec[i, :, :].repeat(toks.shape[1]-prompt_len,1,1).permute(1,0,2)
-                else:
-                    nnmodel.model.layers[i].output[0][:, prompt_len:, :] += intervene_vec[:, :].repeat(toks.shape[1]-prompt_len,1,1).permute(2,0,1)
-                logits = nnmodel.lm_head.output[:, -1, :].save()
-            probas_tok.append(logits.value.softmax(dim=-1).detach().cpu())
-            pred_tok = t.argmax(logits.value, dim=-1, keepdim=True)
-            toks = t.cat([toks, pred_tok.to(toks.device)], dim=-1)
-            l2toks[i] = toks.detach().cpu()[:, start_len:]
-        probas.append(t.stack(probas_tok))
-    probas = t.stack(probas)
-    probas = probas[:, :, 0]
-    
-    if None is not None:
-        return [tokenizer.decode(t) for t in list(l2toks.values())[0]], probas
-    return {k: [tokenizer.decode(t) for t in v] for k, v in l2toks.items()}, probas
