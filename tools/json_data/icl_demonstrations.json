@@ -1,0 +1,72 @@
+{
+    "English": [
+      {
+        "question": "What am I?",
+        "lang": "English",
+        "options": ["Human", "Robot"],
+        "answer": 1
+      },
+      {
+        "question": "Which planet is closest to the sun?",
+        "lang": "English",
+        "options": ["Mercury", "Venus"],
+        "answer": 2
+      }
+    ],
+      "Turkish": [
+      {
+        "question": "Ben neyim?",
+        "lang": "Turkish",
+        "options": ["İnsan", "Robot"],
+        "answer": 1
+      },
+      {
+        "question": "Güneşe en yakın gezegen hangisidir?",
+        "lang": "Turkish",
+        "options": ["Merkür", "Venüs"],
+        "answer": 2
+      }
+    ],
+    "French": [
+      {
+        "question": "Qui suis-je ?",
+        "lang": "French",
+        "options": ["Humain", "Robot"],
+        "answer": 1
+      },
+      {
+        "question": "Quelle planète est la plus proche du Soleil ?",
+        "lang": "French",
+        "options": ["Mercure", "Vénus"],
+        "answer": 2
+      }
+    ],
+    "Russian": [
+      {
+        "question": "Кто я?",
+        "lang": "Russian",
+        "options": ["Человек", "Робот"],
+        "answer": 1
+      },
+      {
+        "question": "Какая планета ближе всего к Солнцу?",
+        "lang": "Russian",
+        "options": ["Меркурий", "Венера"],
+        "answer": 2
+      }
+    ],
+    "Bengali": [
+      {
+        "question": "আমি কে?",
+        "lang": "Bengali",
+        "options": ["মানুষ", "রোবট"],
+        "answer": 1
+      },
+      {
+        "question": "কোন গ্রহ সূর্যের সবচেয়ে কাছে?",
+        "lang": "Bengali",
+        "options": ["বুধ", "শুক্র"],
+        "answer": 2
+      }
+    ]
+  }

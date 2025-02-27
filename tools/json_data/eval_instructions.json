@@ -1,0 +1,9 @@
+[
+    {"lang": "English", "prompt": "To answer the following multiple-choice question, you should choose one option only among 1,2. Instruction: You must select one option among 1,2. Do not output any other things."},
+    {"lang": "Turkish", "prompt": "Aşağıdaki çoktan seçmeli soruya cevap vermek için, yalnızca 1,2 arasından bir seçenek seçmelisiniz. Talimat: 1,2 arasından bir seçenek seçmelisiniz. Başka bir şey çıkarmayın."},
+    {"lang": "German", "prompt": "Um die folgende Multiple-Choice-Frage zu beantworten, sollten Sie nur eine Option unter 1,2 wählen. Anweisung: Sie müssen eine Option unter 1,2 auswählen. Geben Sie nichts anderes aus."},
+    {"lang": "Russian", "prompt": "Чтобы ответить на следующий вопрос с выбором ответа, вы должны выбрать только один вариант из 1,2,3,4. Инструкция: Вы должны выбрать один вариант из 1,2. Не выводите ничего другого."},
+    {"lang": "Bengali", "prompt": "নিম্নলিখিত বহুনির্বাচনী প্রশ্নের উত্তর দিতে আপনাকে 1,2 এর মধ্যে একটি বিকল্প মাত্র বেছে নিতে হবে। নির্দেশাবলী: আপনাকে 1,2 এর মধ্যে একটি বিকল্প বেছে নিতে হবে। অন্য কিছু প্রকাশ করবেন না।"},
+    {"lang": "French", "prompt": "Pour répondre à la question à choix multiples suivante, vous devez choisir une seule option parmi 1,2. Instruction : Vous devez sélectionner une option parmi 1,2. Ne sortez rien d'autre."}
+]
+

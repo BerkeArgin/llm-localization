@@ -1,0 +1,272 @@
+{
+    "Dutch": {
+        "question": "Vraag:",
+        "option": "Opties:",
+        "answer": "Antwoord:"
+    },
+    "Korean": {
+        "question": "질문:",
+        "option": "옵션:",
+        "answer": "답변:"
+    },
+    "English": {
+        "question": "Question:",
+        "option": "Options:",
+        "answer": "Answer:"
+    },
+    "Spanish": {
+        "question": "Pregunta:",
+        "option": "Opciones:",
+        "answer": "Respuesta:"
+    },
+    "Arabic": {
+        "question": "سؤال:",
+        "option": "خيارات:",
+        "answer": "إجابة:"
+    },
+    "Hindi": {
+        "question": "प्रश्न:",
+        "option": "विकल्प:",
+        "answer": "उत्तर:"
+    },
+    "Vietnamese": {
+        "question": "Câu hỏi:",
+        "option": "Tùy chọn:",
+        "answer": "Câu trả lời:"
+    },
+    "Malay": {
+        "question": "Soalan:",
+        "option": "Pilihan:",
+        "answer": "Jawapan:"
+    },
+    "Shona": {
+        "question": "Mubvunzo:",
+        "option": "Sarudzo:",
+        "answer": "Mhinduro:"
+    },
+    "Japanese": {
+        "question": "質問:",
+        "option": "選択肢:",
+        "answer": "答え:"
+    },
+    "Persian": {
+        "question": "سوال:",
+        "option": "گزینه‌ها:",
+        "answer": "پاسخ:"
+    },
+    "Filipino": {
+        "question": "Tanong:",
+        "option": "Mga pagpipilian:",
+        "answer": "Sagot:"
+    },
+    "Hebrew": {
+        "question": "שאלה:",
+        "option": "אפשרויות:",
+        "answer": "תשובה:"
+    },
+    "Bengali": {
+        "question": "প্রশ্ন:",
+        "option": "বিকল্পসমূহ:",
+        "answer": "উত্তর:"
+    },
+    "Ukrainian": {
+        "question": "Питання:",
+        "option": "Варіанти:",
+        "answer": "Відповідь:"
+    },
+    "Czech": {
+        "question": "Otázka:",
+        "option": "Možnosti:",
+        "answer": "Odpověď:"
+    },
+    "Italian": {
+        "question": "Domanda:",
+        "option": "Opzioni:",
+        "answer": "Risposta:"
+    },
+    "Indonesian": {
+        "question": "Pertanyaan:",
+        "option": "Pilihan:",
+        "answer": "Jawaban:"
+    },
+    "French": {
+        "question": "Question:",
+        "option": "Options:",
+        "answer": "Réponse:"
+    },
+    "Nepali": {
+        "question": "प्रश्न:",
+        "option": "विकल्पहरू:",
+        "answer": "उत्तर:"
+    },
+    "Romanian": {
+        "question": "Întrebare:",
+        "option": "Opțiuni:",
+        "answer": "Răspuns:"
+    },
+    "German": {
+        "question": "Frage:",
+        "option": "Optionen:",
+        "answer": "Antwort:"
+    },
+    "Urdu": {
+        "question": "سوال:",
+        "option": "اختیارات:",
+        "answer": "جواب:"
+    },
+    "Portuguese": {
+        "question": "Pergunta:",
+        "option": "Opções:",
+        "answer": "Resposta:"
+    },
+    "Russian": {
+        "question": "Вопрос:",
+        "option": "Варианты:",
+        "answer": "Ответ:"
+    },
+    "Mandarin Chinese": {
+        "question": "问题:",
+        "option": "选项:",
+        "answer": "答案:"
+    },
+    "Chinese (Traditional)": {
+        "question": "問題:",
+        "option": "選項:",
+        "answer": "答案:"
+    },
+    "Turkish": {
+        "question": "Soru:",
+        "option": "Seçenekler:",
+        "answer": "Cevap:"
+    },
+    "Polish": {
+        "question": "Pytanie:",
+        "option": "Opcje:",
+        "answer": "Odpowiedź:"
+    },
+    "Zulu": {
+        "question": "Umbuzo:",
+        "option": "Izinketho:",
+        "answer": "Impendulo:"
+    },
+    "Thai": {
+        "question": "คำถาม:",
+        "option": "ตัวเลือก:",
+        "answer": "คำตอบ:"
+    },
+    "Amharic": {
+        "question": "ጥያቄ:",
+        "option": "አማራጮች:",
+        "answer": "መልስ:"
+    },
+    "Bulgarian": {
+        "question": "Въпрос:",
+        "option": "Опции:",
+        "answer": "Отговор:"
+    },
+    "Fijian": {
+        "question": "Taro:",
+        "option": "Digidigi:",
+        "answer": "iSau:"
+    },
+    "Finnish": {
+        "question": "Kysymys:",
+        "option": "Vaihtoehdot:",
+        "answer": "Vastaus:"
+    },
+    "Greek": {
+        "question": "Ερώτηση:",
+        "option": "Επιλογές:",
+        "answer": "Απάντηση:"
+    },
+    "Hausa": {
+        "question": "Tambaya:",
+        "option": "Zaɓuɓɓuka:",
+        "answer": "Amsa:"
+    },
+    "Hungarian": {
+        "question": "Kérdés:",
+        "option": "Opciók:",
+        "answer": "Válasz:"
+    },
+    "Icelandic": {
+        "question": "Spurning:",
+        "option": "Valkostir:",
+        "answer": "Svar:"
+    },
+    "Igbo": {
+        "question": "Ajụjụ:",
+        "option": "Nhọrọ:",
+        "answer": "Azịza:"
+    },
+    "Irish": {
+        "question": "Ceist:",
+        "option": "Roghanna:",
+        "answer": "Freagra:"
+    },
+    "Lithuanian": {
+        "question": "Klausimas:",
+        "option": "Pasirinkimai:",
+        "answer": "Atsakymas:"
+    },
+    "Mongolian": {
+        "question": "Асуулт:",
+        "option": "Сонголтууд:",
+        "answer": "Хариулт:"
+    },
+    "Norwegian": {
+        "question": "Spørsmål:",
+        "option": "Alternativer:",
+        "answer": "Svar:"
+    },
+    "Pashto": {
+        "question": "پوښتنه:",
+        "option": "اختیارونه:",
+        "answer": "ځواب:"
+    },
+    "Punjabi": {
+        "question": "ਸਵਾਲ:",
+        "option": "ਚੋਣਾਂ:",
+        "answer": "ਜਵਾਬ:"
+    },
+    "Serbian": {
+        "question": "Pitanje:",
+        "option": "Opcije:",
+        "answer": "Odgovor:"
+    },
+    "Swahili": {
+        "question": "Swali:",
+        "option": "Machaguo:",
+        "answer": "Jibu:"
+    },
+    "Swedish": {
+        "question": "Fråga:",
+        "option": "Alternativ:",
+        "answer": "Svar:"
+    },
+    "Tahitian": {
+        "question": "Uiraa:",
+        "option": "Mau maiti:",
+        "answer": "Pahonoraa:"
+    },
+    "Tibetan": {
+        "question": "འདྲི་བ་:",
+        "option": "གདམ་གསེས་:",
+        "answer": "ལན་:"
+    },
+    "Tongan": {
+        "question": "Fehu'i:",
+        "option": "Filifiliga:",
+        "answer": "Tali:"
+    },
+    "Twi": {
+        "question": "Nsɛmmisa:",
+        "option": "Nhyehyɛe:",
+        "answer": "Mmuaeɛ:"
+    },
+    "Yoruba": {
+        "question": "Ibéèrè:",
+        "option": "Àṣàyàn:",
+        "answer": "Ìdáhùn:"
+    }
+}
