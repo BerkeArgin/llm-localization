@@ -33,7 +33,7 @@ def load_prompt_lang_map():
 
 
 def reload_globals():
-    global DEMONSTRATIONS, PROMPT_LANG_MAP, LANG_HEADER_MAP, COUNTRY_HEADER_MAP, COUNTRY_LANGUAGE_MAP
+    global DEMONSTRATIONS, PROMPT_LANG_MAP, LANG_HEADER_MAP
     DEMONSTRATIONS = load_demonstrations()
     PROMPT_LANG_MAP = load_prompt_lang_map()
     LANG_HEADER_MAP = load_lang_headers()

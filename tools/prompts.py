@@ -26,7 +26,7 @@ def format_multi_choice(row):
     return f"{q_header}{instruct}\n{question}\n{o_header}\n{options}"
 
 def format_multi_choice_5choice(row):
-    instruct = PROMPT_LANG_MAP[row["lang"]].replace("1,2,3,4", "1,2,3,4,5")
+    instruct = PROMPT_LANG_MAP[row["lang"]].replace("1,2", "1,2,3,4,5")
     question = row["question"]
     q_header, o_header, a_header = LANG_HEADER_MAP[row["lang"]]
     options = "\n".join([f"{str(i+1)}. {opt}" for i, opt in enumerate(row["options"])])
