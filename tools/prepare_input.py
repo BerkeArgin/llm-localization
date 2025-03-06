@@ -70,7 +70,7 @@ def prepare_dataset_steer(data_df, tokenizer=None):
         data_df["input"] += data_df["lang"].apply(lambda x: f"{prompt_suffix[x]}")
     return data_df
 
-def prepare_dataset_5choice(data_df, tokenizer=None):
+def prepare_dataset_5choice_it(data_df, tokenizer=None):
     data_df["prompt"] = data_df.apply(format_multi_choice_5choice, axis=1)
     data_df["messages"] = data_df.apply(lambda x: [{"role": "user", "content": x["prompt"]}], axis=1)
     if tokenizer:

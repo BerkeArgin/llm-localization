@@ -50,10 +50,10 @@ def get_patching_probs(data_row, tokenizer, token_index):
 
 
     
-    data_row["prob_west"] = data_row["patch_prob"].to_dense()[token_index, ind_west].float().numpy()
-    data_row["prob_local"] = data_row["patch_prob"].to_dense()[token_index, ind_local].float().numpy()
-    data_row["prob_source"] = max(data_row["patch_prob"].to_dense()[token_index, ind_source_1].float().numpy(),
-                                    data_row["patch_prob"].to_dense()[token_index, ind_source_2].float().numpy())
+    data_row["prob_west"] = data_row["patch_prob"][token_index, ind_west].float().numpy()
+    data_row["prob_local"] = data_row["patch_prob"][token_index, ind_local].float().numpy()
+    data_row["prob_source"] = max(data_row["patch_prob"][token_index, ind_source_1].float().numpy(),
+                                    data_row["patch_prob"][token_index, ind_source_2].float().numpy())
     return data_row
 
 def zero_ablate_scope_gen(nnmodel, tokenizer, 
@@ -167,6 +167,8 @@ def plot_avg_probs_ax(data_df, include_source=False, ax=None):
 
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 4))
+    else:
+        fig = None
     
         
     data_df.groupby("layer")["prob_west"].apply(lambda x: west_total.append(x))
@@ -198,9 +200,6 @@ def plot_avg_probs_ax(data_df, include_source=False, ax=None):
     
     x = np.arange(west_mean.shape[0])
     
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(10, 6))
-    
     ax.scatter(x, west_mean, color='blue')
     ax.scatter(x, local_mean, color='orange')
     ax.plot(x, west_mean, color='blue', label='Non Loc. Prob')
@@ -225,8 +224,8 @@ def plot_avg_probs_ax(data_df, include_source=False, ax=None):
 
     ax.legend()
     plt.tight_layout()
+
     if ax is None:
         plt.show()
     return fig, ax
-
 
