@@ -1,47 +1,49 @@
-import openai
 import json
+from openai import OpenAI
 from tqdm import tqdm
 
-class SwissAIWrapper:
-    def __init__(self, api_key, model_name="meta-llama/Meta-Llama-3.1-70B-Instruct"):
-        self.client = openai.Client(api_key=api_key, base_url="http://148.187.108.173:8080")
-        self.model_name = model_name
-    
-    def text_gen(self, messages):
-        res = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=messages
-        )
-        return res.choices[0].message.content
-    
-    def text_gen_batch(self, batch):
-        return [self.text_gen(e) for e in batch]
 
 class OpenAIWrapper:
     def __init__(self, api_key, base_url=None):
         if base_url is None:
-            self.client = openai.Client(api_key=api_key)
+            self.client = OpenAI(api_key=api_key)
         else:
-            self.client = openai.Client(api_key=api_key, base_url=base_url)
+            self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.last_batch_input_file = None
     
     def prompt_to_msg(self, prompt):
         return [{"role": "user", "content": prompt}]
 
-    def text_gen(self, messages, model_name="gpt-4o"):
+    def text_gen(self, messages, model_name="gpt-4o", ignore_gen_params=False, **kwargs):
         if isinstance(messages, str):
             messages = self.prompt_to_msg(messages)
-        res = self.client.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            temperature=0,  # Greedy decoding
-            top_p=1,         # No nucleus sampling
-            n=1,              # Single output
-        )
+        if ignore_gen_params:
+            res = self.client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                **kwargs
+            )
+        else:
+            res = self.client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=0,  # Greedy decoding
+                top_p=1,         # No nucleus sampling
+                n=1,              # Single output
+            )
         if len(res.choices) == 1:
             return res.choices[0].message.content
         else:
             return [res.choices[i].message.content for i in range(len(res.choices))]
+    
+    def embed(self, input, model="text-embedding-ada-002"):
+        if isinstance(input, str):
+            input = [input]
+        res = self.client.embeddings.create(
+            model=model,
+            input=input
+        )
+        return [e.embedding for e in res.data]
     
     def generate_batch_file(self,conversations, model_name="gpt-4o", job_id="job-1"):
         requests = []
